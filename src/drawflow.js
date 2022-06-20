@@ -1178,7 +1178,9 @@ export default class Drawflow {
     return nodes;
   }
 
-  addNode (name, num_in, num_out, ele_pos_x, ele_pos_y, classoverride, data, html, typenode = false) {
+  addNode (name, num_in, num_out, ele_pos_x, ele_pos_y, classoverride, data, html, typenode = false, input_tooltips, output_tooltips) {
+    input_tooltips = input_tooltips || {};
+    output_tooltips = output_tooltips || {};
     if (this.useuuid) {
       var newNodeId = this.getUuid();
     } else {
@@ -1207,6 +1209,18 @@ export default class Drawflow {
       input.classList.add("input");
       input.classList.add("input_"+(x+1));
       json_inputs["input_"+(x+1)] = { "connections": []};
+      if(input_tooltips.hasOwnProperty(x+1)) {
+        const ttip = document.createElement('span');
+        ttip.classList.add("tooltip");
+        ttip.classList.add("input-tooltip");
+        ttip.innerHTML = input_tooltips[x+1]['name'] + ' ';
+        // type
+        const ttip_type = document.createElement('span');
+        ttip_type.classList.add('type');
+        ttip_type.innerHTML = input_tooltips[x+1]['type'];
+        ttip.appendChild(ttip_type);
+        input.appendChild(ttip);
+      }
       inputs.appendChild(input);
     }
 
@@ -1216,6 +1230,18 @@ export default class Drawflow {
       output.classList.add("output");
       output.classList.add("output_"+(x+1));
       json_outputs["output_"+(x+1)] = { "connections": []};
+      if(output_tooltips.hasOwnProperty(x+1)) {
+        const ttip = document.createElement('span');
+        ttip.classList.add("tooltip");
+        ttip.classList.add("output-tooltip");
+        ttip.innerHTML = output_tooltips[x+1]['name'] + ' ';
+        // type
+        const ttip_type = document.createElement('span');
+        ttip_type.classList.add('type');
+        ttip_type.innerHTML = output_tooltips[x+1]['type'];
+        ttip.appendChild(ttip_type);
+        output.appendChild(ttip);
+      }
       outputs.appendChild(output);
     }
 
@@ -1280,6 +1306,7 @@ export default class Drawflow {
         });
       }
     }
+
     node.appendChild(inputs);
     node.appendChild(content);
     node.appendChild(outputs);

@@ -139,3 +139,38 @@
   right: -15px;
   top: -15px;
 }
+
+.tooltip {
+  visibility: hidden;
+  width: 120px;
+  background-color: gainsboro;
+  color: black;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+ 
+  position: absolute;
+  z-index: 1;
+  bottom: -5px;
+}
+
+.tooltip .type {
+  background-color: green;
+  color: black;
+}
+
+.input .input-tooltip {
+  right: 19px;
+}
+
+.input:hover .input-tooltip {
+  visibility: visible;
+}
+
+.output .output-tooltip {
+  left: 19px;
+}
+
+.output:hover .output-tooltip {
+  visibility: visible;
+}
