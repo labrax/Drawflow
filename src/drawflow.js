@@ -1185,7 +1185,7 @@ export default class Drawflow {
     input_tooltips = input_tooltips || {};
     output_tooltips = output_tooltips || {};
 
-    function onSuccess(response) {
+    function onSuccess(response, editor) {
       console.log(response);
       var newNodeId = response['node_id'];
 
@@ -1253,20 +1253,20 @@ export default class Drawflow {
       if(typenode === false) {
         content.innerHTML = html;
       } else if (typenode === true) {
-        content.appendChild(this.noderegister[html].html.cloneNode(true));
+        content.appendChild(editor.noderegister[html].html.cloneNode(true));
       } else {
-        if(parseInt(this.render.version) === 3 ) {
+        if(parseInt(editor.render.version) === 3 ) {
           //Vue 3
-          let wrapper = this.render.h(this.noderegister[html].html, this.noderegister[html].props, this.noderegister[html].options);
-          wrapper.appContext = this.parent;
-          this.render.render(wrapper,content);
+          let wrapper = editor.render.h(editor.noderegister[html].html, editor.noderegister[html].props, editor.noderegister[html].options);
+          wrapper.appContext = editor.parent;
+          editor.render.render(wrapper,content);
   
         } else {
           // Vue 2
-          let wrapper = new this.render({
-            parent: this.parent,
-            render: h => h(this.noderegister[html].html, { props: this.noderegister[html].props }),
-            ...this.noderegister[html].options
+          let wrapper = new editor.render({
+            parent: editor.parent,
+            render: h => h(editor.noderegister[html].html, { props: editor.noderegister[html].props }),
+            ...editor.noderegister[html].options
           }).$mount()
           //
           content.appendChild(wrapper.$el);
@@ -1316,7 +1316,7 @@ export default class Drawflow {
       node.style.top = ele_pos_y + "px";
       node.style.left = ele_pos_x + "px";
       parent.appendChild(node);
-      this.precanvas.appendChild(parent);
+      editor.precanvas.appendChild(parent);
       var json = {
         id: newNodeId,
         name: name,
@@ -1329,11 +1329,8 @@ export default class Drawflow {
         pos_x: ele_pos_x,
         pos_y: ele_pos_y,
       }
-      this.drawflow.drawflow[this.module].data[newNodeId] = json;
-      this.dispatch('nodeCreated', newNodeId);
-      if (!this.useuuid) {
-        this.nodeId++;
-      }
+      editor.drawflow.drawflow[editor.module].data[newNodeId] = json;
+      editor.dispatch('nodeCreated', newNodeId);
       return newNodeId;
     }
     this.requestOperation('addNode', {'name': name}, onSuccess);
@@ -1986,7 +1983,7 @@ export default class Drawflow {
       superagent
         .post('/api/v1/' + operation)
         .send({ payload }) // sends a JSON post body
-        .set('X-API-Key', 'foobar')
+        .set('X-API-Key', 'XXXXXXXXX')
         .set('accept', 'json')
         .end((err, res) => {
           if(err) {
@@ -1995,7 +1992,7 @@ export default class Drawflow {
           } else {
             // res.body, res.headers, res.status
             console.log(res);
-            callback(res.body);
+            callback(JSON.parse(res.text), this);
           }
         });
     }
