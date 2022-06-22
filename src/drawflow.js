@@ -88,6 +88,8 @@ export default class Drawflow {
     this.container.onpointerout = this.pointerup_handler.bind(this);
     this.container.onpointerleave = this.pointerup_handler.bind(this);
 
+    this.refresh();
+
     this.load();
   }
 
@@ -352,6 +354,7 @@ export default class Drawflow {
     if(this.editor_selected) {
       x =  this.canvas_x + (-(this.pos_x - e_pos_x))
       y = this.canvas_y + (-(this.pos_y - e_pos_y))
+      this.requestOperation('translate', {'x': x, 'y': y}, function(res, e){});
       this.dispatch('translate', { x: x, y: y});
       this.precanvas.style.transform = "translate("+x+"px, "+y+"px) scale("+this.zoom+")";
     }
@@ -431,6 +434,7 @@ export default class Drawflow {
 
     if(this.drag) {
       if(this.pos_x_start != e_pos_x || this.pos_y_start != e_pos_y) {
+        this.requestOperation('nodeMoved', {'id': this.ele_selected.id, 'pos_x': e_pos_x, 'pos_y': e_pos_y}, function(res, edi){});
         this.dispatch('nodeMoved', this.ele_selected.id.slice(5));
       }
     }
@@ -476,7 +480,12 @@ export default class Drawflow {
           if(this.container.querySelectorAll('.connection.node_in_'+input_id+'.node_out_'+output_id+'.'+output_class+'.'+input_class).length === 0) {
           // Conection no exist save connection
 
-          this.connection_ele.classList.add("node_in_"+input_id);
+            var id_input = input_id.slice(5);
+            var id_output = output_id.slice(5);
+            this.addConnection(id_output, id_input, output_class, input_class);
+            this.connection_ele.remove();
+
+          /*this.connection_ele.classList.add("node_in_"+input_id);
           this.connection_ele.classList.add("node_out_"+output_id);
           this.connection_ele.classList.add(output_class);
           this.connection_ele.classList.add(input_class);
@@ -488,13 +497,13 @@ export default class Drawflow {
           this.updateConnectionNodes('node-'+id_output);
           this.updateConnectionNodes('node-'+id_input);
           this.dispatch('connectionCreated', { output_id: id_output, input_id: id_input, output_class:  output_class, input_class: input_class});
+          */
 
         } else {
           this.dispatch('connectionCancel', true);
           this.connection_ele.remove();
         }
-
-          this.connection_ele = null;
+        this.connection_ele = null;
       } else {
         // Connection exists Remove Connection;
         this.dispatch('connectionCancel', true);
@@ -582,6 +591,7 @@ export default class Drawflow {
     }
   }
   zoom_refresh(){
+    this.requestOperation('zoom', {'zoom': this.zoom}, function(res, e){});
     this.dispatch('zoom', this.zoom);
     this.canvas_x = (this.canvas_x / this.zoom_last_value) * this.zoom;
     this.canvas_y = (this.canvas_y / this.zoom_last_value) * this.zoom;
@@ -693,12 +703,17 @@ export default class Drawflow {
 
   }
 
-  addConnection(id_output, id_input, output_class, input_class) {
-    var nodeOneModule = this.getModuleFromNodeId(id_output);
-    var nodeTwoModule = this.getModuleFromNodeId(id_input);
+  onSuccess_addConnection(response, editor) {
+    var id_output = response['id_output'];
+    var id_input = response['id_input'];
+    var output_class = response['output_class'];
+    var input_class = response['input_class'];
+
+    var nodeOneModule = editor.getModuleFromNodeId(id_output);
+    var nodeTwoModule = editor.getModuleFromNodeId(id_input);
     if(nodeOneModule === nodeTwoModule) {
 
-      var dataNode = this.getNodeFromId(id_output);
+      var dataNode = editor.getNodeFromId(id_output);
       var exist = false;
       for(var checkOutput in dataNode.outputs[output_class].connections){
         var connectionSearch = dataNode.outputs[output_class].connections[checkOutput]
@@ -709,10 +724,10 @@ export default class Drawflow {
       // Check connection exist
       if(exist === false) {
         //Create Connection
-        this.drawflow.drawflow[nodeOneModule].data[id_output].outputs[output_class].connections.push( {"node": id_input.toString(), "output": input_class});
-        this.drawflow.drawflow[nodeOneModule].data[id_input].inputs[input_class].connections.push( {"node": id_output.toString(), "input": output_class});
+        editor.drawflow.drawflow[nodeOneModule].data[id_output].outputs[output_class].connections.push( {"node": id_input.toString(), "output": input_class});
+        editor.drawflow.drawflow[nodeOneModule].data[id_input].inputs[input_class].connections.push( {"node": id_output.toString(), "input": output_class});
 
-        if(this.module === nodeOneModule) {
+        if(editor.module === nodeOneModule) {
         //Draw connection
           var connection = document.createElementNS('http://www.w3.org/2000/svg',"svg");
           var path = document.createElementNS('http://www.w3.org/2000/svg',"path");
@@ -725,14 +740,18 @@ export default class Drawflow {
           connection.classList.add(output_class);
           connection.classList.add(input_class);
           connection.appendChild(path);
-          this.precanvas.appendChild(connection);
-          this.updateConnectionNodes('node-'+id_output);
-          this.updateConnectionNodes('node-'+id_input);
+          editor.precanvas.appendChild(connection);
+          editor.updateConnectionNodes('node-'+id_output);
+          editor.updateConnectionNodes('node-'+id_input);
         }
 
-        this.dispatch('connectionCreated', { output_id: id_output, input_id: id_input, output_class:  output_class, input_class: input_class});
+        editor.dispatch('connectionCreated', { output_id: id_output, input_id: id_input, output_class:  output_class, input_class: input_class});
       }
     }
+  }
+
+  addConnection(id_output, id_input, output_class, input_class) {
+    this.requestOperation('addConnection', {'id_output': id_output, 'id_input': id_input, 'output_class': output_class, 'input_class': input_class}, this.onSuccess_addConnection);
   }
 
   updateConnectionNodes(id) {
@@ -1181,13 +1200,20 @@ export default class Drawflow {
     return nodes;
   }
 
-  addNode (name, num_in, num_out, ele_pos_x, ele_pos_y, classoverride, data, html, typenode = false, input_tooltips, output_tooltips) {
-    input_tooltips = input_tooltips || {};
-    output_tooltips = output_tooltips || {};
-
-    function onSuccess(response, editor) {
+  onSuccess_addNode(response, editor) {
       console.log(response);
       var newNodeId = response['node_id'];
+      var num_in = response['num_in'];
+      var num_out = response['num_out'];
+      var input_tooltips = response['input_tooltips'];
+      var output_tooltips = response['output_tooltips'];
+      var typenode = response['typenode'];
+      var html = response['html'];
+      var classoverride = response['classoverride'];
+      var data = response['other_data'];
+      var ele_pos_x = response['pos']['x'];
+      var ele_pos_y = response['pos']['y'];
+
 
       const parent = document.createElement('div');
       parent.classList.add("parent-node");
@@ -1333,8 +1359,10 @@ export default class Drawflow {
       editor.dispatch('nodeCreated', newNodeId);
       return newNodeId;
     }
-    this.requestOperation('addNode', {'name': name}, onSuccess);
-  }
+
+    addNode (name, ele_pos_x, ele_pos_y) {
+      this.requestOperation('addNode', {'name': name, 'ele_pos_x': ele_pos_x, 'ele_pos_y': ele_pos_y}, this.onSuccess_addNode);
+    }
 
   addNodeImport (dataNode, precanvas) {
     const parent = document.createElement('div');
@@ -1744,31 +1772,42 @@ export default class Drawflow {
     this.updateConnectionNodes('node-'+id);
   }
 
-  removeNodeId(id) {
-    this.removeConnectionNodeId(id);
-    var moduleName = this.getModuleFromNodeId(id.slice(5))
-    if(this.module === moduleName) {
-      this.container.querySelector(`#${id}`).remove();
+  onSuccess_removeNodeId(response, editor) {
+    var id = response['id'];
+    editor.removeConnectionNodeId(id);
+    var moduleName = editor.getModuleFromNodeId(id.slice(5))
+    if(editor.module === moduleName) {
+      editor.container.querySelector(`#${id}`).remove();
     }
-    delete this.drawflow.drawflow[moduleName].data[id.slice(5)];
-    this.dispatch('nodeRemoved', id.slice(5));
+    delete editor.drawflow.drawflow[moduleName].data[id.slice(5)];
+    editor.dispatch('nodeRemoved', id.slice(5));
+  }
+
+  removeNodeId(id) {
+    this.requestOperation('removeNodeId', {'id': id}, this.onSuccess_removeNodeId);
+  }
+
+  onSuccess_removeConnection(response, editor) {
+      var p_element = document.getElementsByClassName(response['class_list'])[0];
+
+      var listclass = p_element.classList;
+      p_element.remove();
+      //console.log(listclass);
+      var index_out = editor.drawflow.drawflow[editor.module].data[listclass[2].slice(14)].outputs[listclass[3]].connections.findIndex(function(item,i) {
+        return item.node === listclass[1].slice(13) && item.output === listclass[4]
+      });
+      editor.drawflow.drawflow[editor.module].data[listclass[2].slice(14)].outputs[listclass[3]].connections.splice(index_out,1);
+
+      var index_in = editor.drawflow.drawflow[editor.module].data[listclass[1].slice(13)].inputs[listclass[4]].connections.findIndex(function(item,i) {
+        return item.node === listclass[2].slice(14) && item.input === listclass[3]
+      });
+      editor.drawflow.drawflow[editor.module].data[listclass[1].slice(13)].inputs[listclass[4]].connections.splice(index_in,1);
+      editor.dispatch('connectionRemoved', { output_id: listclass[2].slice(14), input_id: listclass[1].slice(13), output_class: listclass[3], input_class: listclass[4] } );
   }
 
   removeConnection() {
     if(this.connection_selected != null) {
-      var listclass = this.connection_selected.parentElement.classList;
-      this.connection_selected.parentElement.remove();
-      //console.log(listclass);
-      var index_out = this.drawflow.drawflow[this.module].data[listclass[2].slice(14)].outputs[listclass[3]].connections.findIndex(function(item,i) {
-        return item.node === listclass[1].slice(13) && item.output === listclass[4]
-      });
-      this.drawflow.drawflow[this.module].data[listclass[2].slice(14)].outputs[listclass[3]].connections.splice(index_out,1);
-
-      var index_in = this.drawflow.drawflow[this.module].data[listclass[1].slice(13)].inputs[listclass[4]].connections.findIndex(function(item,i) {
-        return item.node === listclass[2].slice(14) && item.input === listclass[3]
-      });
-      this.drawflow.drawflow[this.module].data[listclass[1].slice(13)].inputs[listclass[4]].connections.splice(index_in,1);
-      this.dispatch('connectionRemoved', { output_id: listclass[2].slice(14), input_id: listclass[1].slice(13), output_class: listclass[3], input_class: listclass[4] } );
+      this.requestOperation('removeConnection', {'class_list': this.connection_selected.parentElement.classList.toString()}, this.onSuccess_removeConnection)
       this.connection_selected = null;
     }
   }
@@ -1872,6 +1911,7 @@ export default class Drawflow {
     this.drawflow.drawflow[name] =  { "data": {} };
     this.dispatch('moduleCreated', name);
   }
+
   changeModule(name) {
     this.dispatch('moduleChanged', name);
     this.module = name;
@@ -1980,6 +2020,7 @@ export default class Drawflow {
 
     requestOperation(operation, payload, callback) {
       // callback
+      payload['file'] = file;
       superagent
         .post('/api/v1/' + operation)
         .send({ payload }) // sends a JSON post body
@@ -1991,9 +2032,53 @@ export default class Drawflow {
             console.log(err);
           } else {
             // res.body, res.headers, res.status
-            console.log(res);
             callback(JSON.parse(res.text), this);
           }
         });
+    }
+
+    onSuccess_refresh(response, editor) {
+      var rel = document.getElementsByClassName('col')[0];
+      rel.innerHTML = response['html'];
+    }
+
+    refresh() {
+      this.requestOperation('refresh', {}, this.onSuccess_refresh);
+    }
+
+    onSuccess_run(response, editor) {
+      //TODO: implement
+      console.log(response);
+    }
+
+    run() {
+      this.requestOperation('run', {}, this.onSuccess_run);
+    }
+
+    onSuccess_setParameter(response, editor) {
+      var node = document.getElementsByClassName('node-name-' + response['node'])[0];
+      var parent = node.parentElement.parentElement;
+      var icon = parent.getElementsByClassName('red-iconcolor')[0];
+      icon.classList.remove('red-iconcolor');
+      icon.classList.add('green-iconcolor');
+      var ttip = document.getElementById('node-' + response['node']).getElementsByClassName('tooltip')[0];
+      ttip.innerHTML = response['name'] + ' ';
+
+      const ttip_type = document.createElement('span');
+      ttip_type.classList.add('type');
+      ttip_type.innerHTML = response['type'];
+      ttip.appendChild(ttip_type);
+    }
+
+    setParameter(node_id) {
+      this.requestOperation('setParameter', {'node': node_id, 'name': document.getElementsByClassName('node-name-' + node_id)[0].value, 'type': document.getElementsByClassName('node-type-' + node_id)[0].value}, this.onSuccess_setParameter)
+    }
+
+    onSuccess_save(response, editor) {
+
+    }
+
+    save() {
+
     }
 }
