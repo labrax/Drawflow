@@ -751,7 +751,7 @@ export default class Drawflow {
   }
 
   addConnection(id_output, id_input, output_class, input_class) {
-    this.requestOperation('addConnection', {'id_output': id_output, 'id_input': id_input, 'output_class': output_class, 'input_class': input_class}, this.onSuccess_addConnection);
+    this.requestOperation('addConnection', {'id_output': id_output, 'id_input': id_input, 'output_class': output_class, 'input_class': input_class});
   }
 
   updateConnectionNodes(id) {
@@ -1201,7 +1201,6 @@ export default class Drawflow {
   }
 
   onSuccess_addNode(response, editor) {
-      console.log(response);
       var newNodeId = response['node_id'];
       var num_in = response['num_in'];
       var num_out = response['num_out'];
@@ -1361,7 +1360,7 @@ export default class Drawflow {
     }
 
     addNode (name, ele_pos_x, ele_pos_y) {
-      this.requestOperation('addNode', {'name': name, 'ele_pos_x': ele_pos_x, 'ele_pos_y': ele_pos_y}, this.onSuccess_addNode);
+      this.requestOperation('addNode', {'name': name, 'ele_pos_x': ele_pos_x, 'ele_pos_y': ele_pos_y});
     }
 
   addNodeImport (dataNode, precanvas) {
@@ -1784,7 +1783,7 @@ export default class Drawflow {
   }
 
   removeNodeId(id) {
-    this.requestOperation('removeNodeId', {'id': id}, this.onSuccess_removeNodeId);
+    this.requestOperation('removeNodeId', {'id': id});
   }
 
   onSuccess_removeConnection(response, editor) {
@@ -1807,7 +1806,7 @@ export default class Drawflow {
 
   removeConnection() {
     if(this.connection_selected != null) {
-      this.requestOperation('removeConnection', {'class_list': this.connection_selected.parentElement.classList.toString()}, this.onSuccess_removeConnection)
+      this.requestOperation('removeConnection', {'class_list': this.connection_selected.parentElement.classList.toString()})
       this.connection_selected = null;
     }
   }
@@ -2018,7 +2017,42 @@ export default class Drawflow {
         return uuid;
     }
 
-    requestOperation(operation, payload, callback) {
+    onSuccess_requestOperation(response, editor) {
+      console.log(response);
+      switch(response['operation']) {
+        case 'addNode':
+          editor.onSuccess_addNode(response, editor);
+          break;
+        case 'removeNodeId':
+          editor.onSuccess_removeNodeId(response, editor);
+          break;
+        case 'addConnection':
+          editor.onSuccess_addConnection(response, editor);
+          break;
+        case 'removeConnection':
+          editor.onSuccess_removeConnection(response, editor);
+          break;
+        case 'refresh':
+          editor.onSuccess_refresh(response, editor);
+          break;
+        case 'run':
+          editor.onSuccess_run(response, editor);
+          break;
+        case 'setParameter':
+          editor.onSuccess_setParameter(response, editor);
+          break;
+        case 'save':
+          editor.onSuccess_save(response, editor);
+          break;
+        case 'nodeMoved':
+        case 'translate':
+        case 'zoom':
+          break
+        default:
+      }
+    }
+
+    requestOperation(operation, payload) {
       // callback
       payload['file'] = file;
       superagent
@@ -2032,7 +2066,7 @@ export default class Drawflow {
             console.log(err);
           } else {
             // res.body, res.headers, res.status
-            callback(JSON.parse(res.text), this);
+            this.onSuccess_requestOperation(JSON.parse(res.text), this);
           }
         });
     }
@@ -2043,16 +2077,20 @@ export default class Drawflow {
     }
 
     refresh() {
-      this.requestOperation('refresh', {}, this.onSuccess_refresh);
+      this.requestOperation('refresh', {});
     }
 
     onSuccess_run(response, editor) {
       //TODO: implement
+      
       console.log(response);
+
+      document.getElementById('run').classList.remove('fa-fade')
     }
 
     run() {
-      this.requestOperation('run', {}, this.onSuccess_run);
+      this.requestOperation('run', {});
+      document.getElementById('run').classList.remove('fa-fade')
     }
 
     onSuccess_setParameter(response, editor) {
@@ -2068,17 +2106,20 @@ export default class Drawflow {
       ttip_type.classList.add('type');
       ttip_type.innerHTML = response['type'];
       ttip.appendChild(ttip_type);
+
+      document.getElementById('refresh').classList.remove('fa-spin')
     }
 
     setParameter(node_id) {
-      this.requestOperation('setParameter', {'node': node_id, 'name': document.getElementsByClassName('node-name-' + node_id)[0].value, 'type': document.getElementsByClassName('node-type-' + node_id)[0].value}, this.onSuccess_setParameter)
+      document.getElementById('refresh').classList.add('fa-spin')
+      this.requestOperation('setParameter', {'node': node_id, 'name': document.getElementsByClassName('node-name-' + node_id)[0].value, 'type': document.getElementsByClassName('node-type-' + node_id)[0].value})
     }
 
     onSuccess_save(response, editor) {
-
+      console.log(response, editor)
     }
 
     save() {
-
+      this.requestOperation('save', {})
     }
 }
